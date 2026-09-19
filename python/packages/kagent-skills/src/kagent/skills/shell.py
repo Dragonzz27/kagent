@@ -161,6 +161,15 @@ def _sanitize_env(env: dict[str, str] | None = None) -> dict[str, str]:
 
 def _get_command_timeout_seconds(command: str) -> float:
     """Determine appropriate timeout for a command."""
+    configured = os.environ.get("KAGENT_COMMAND_TIMEOUT", "").strip()
+    # Match the Go executor's positive whole seconds and time.Duration range.
+    if configured.isascii() and configured.isdecimal():
+        try:
+            seconds = int(configured)
+            if 0 < seconds <= (2**63 - 1) // 1_000_000_000:
+                return seconds
+        except ValueError:
+            pass  # An excessively long integer is invalid too; keep the defaults.
     if "python " in command or "python3 " in command:
         return 60.0  # 1 minute for python scripts
     else:

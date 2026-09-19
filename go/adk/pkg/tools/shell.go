@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -147,10 +148,7 @@ func NewCommandExecutor() *CommandExecutor {
 
 // ExecuteCommand executes a shell command.
 func (e *CommandExecutor) ExecuteCommand(ctx context.Context, command string, workingDir string) (string, error) {
-	timeout := 30 * time.Second
-	if strings.Contains(command, "python") {
-		timeout = 60 * time.Second
-	}
+	timeout := commandTimeout(command, os.Getenv("KAGENT_COMMAND_TIMEOUT"))
 
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
@@ -194,4 +192,16 @@ func (e *CommandExecutor) ExecuteCommand(ctx context.Context, command string, wo
 		return "Command completed successfully.", nil
 	}
 	return res, nil
+}
+
+func commandTimeout(command, configured string) time.Duration {
+	// Check before multiplying so an overflowing duration cannot become negative.
+	seconds, err := strconv.ParseUint(strings.TrimSpace(configured), 10, 64)
+	if err == nil && seconds > 0 && seconds <= uint64((1<<63-1)/time.Second) {
+		return time.Duration(seconds) * time.Second
+	}
+	if strings.Contains(command, "python") {
+		return 60 * time.Second
+	}
+	return 30 * time.Second
 }

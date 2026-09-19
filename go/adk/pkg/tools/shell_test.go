@@ -456,3 +456,44 @@ func TestExecuteCommand_Timeout(t *testing.T) {
 		t.Logf("Note: Got non-empty result on timeout: %q", result)
 	}
 }
+
+func TestExecuteCommandConfiguredTimeout(t *testing.T) {
+	t.Setenv("KAGENT_COMMAND_TIMEOUT", "1")
+	result, err := NewCommandExecutor().ExecuteCommand(t.Context(), "exec sleep 2", t.TempDir())
+	if err == nil || !strings.Contains(err.Error(), "command timed out after 1s") {
+		t.Fatalf("expected configured timeout, got result %q and error %v", result, err)
+	}
+}
+
+func TestCommandTimeout(t *testing.T) {
+	for _, configured := range []string{"", "0", "-1", "1.5", "NaN", "Inf", "1s", "invalid", "1_0", "９", "9223372037", "18446744073709551616"} {
+		for _, command := range []string{"echo hello", "python script.py", "python3 script.py"} {
+			t.Run(configured+"/"+command, func(t *testing.T) {
+				want := 30 * time.Second
+				if strings.Contains(command, "python") {
+					want = 60 * time.Second
+				}
+				if got := commandTimeout(command, configured); got != want {
+					t.Fatalf("timeout = %v, want %v", got, want)
+				}
+			})
+		}
+	}
+	for _, configured := range []string{"120", " 120 ", "00120"} {
+		for _, command := range []string{"echo hello", "python script.py"} {
+			if got := commandTimeout(command, configured); got != 120*time.Second {
+				t.Errorf("commandTimeout(%q, %q) = %v, want 2m", command, configured, got)
+			}
+		}
+	}
+}
+
+func TestConfiguredCommandTimeoutPreservesEarlierDeadline(t *testing.T) {
+	t.Setenv("KAGENT_COMMAND_TIMEOUT", "120")
+	ctx, cancel := context.WithDeadline(t.Context(), time.Now().Add(-time.Second))
+	defer cancel()
+	_, err := NewCommandExecutor().ExecuteCommand(ctx, "echo hello", t.TempDir())
+	if err == nil {
+		t.Fatal("configured timeout must not extend the caller's expired deadline")
+	}
+}
