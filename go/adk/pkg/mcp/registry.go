@@ -81,6 +81,7 @@ type mcpServerParams struct {
 	Dir                   string
 	Timeout               *float64
 	SseReadTimeout        *float64
+	DisableStandaloneSSE  *bool
 	TLSInsecureSkipVerify *bool
 	TLSCACertPath         *string
 	TLSDisableSystemCAs   *bool
@@ -131,6 +132,7 @@ func CreateToolsets(
 			ServerType:            "http",
 			Timeout:               httpTool.Params.Timeout,
 			SseReadTimeout:        httpTool.Params.SseReadTimeout,
+			DisableStandaloneSSE:  httpTool.Params.DisableStandaloneSSE,
 			TLSInsecureSkipVerify: httpTool.Params.TLSInsecureSkipVerify,
 			TLSCACertPath:         httpTool.Params.TLSCACertPath,
 			TLSDisableSystemCAs:   httpTool.Params.TLSDisableSystemCAs,
@@ -286,8 +288,9 @@ func createTransport(ctx context.Context, params mcpServerParams) (mcpsdk.Transp
 		}
 	} else {
 		mcpTransport = &mcpsdk.StreamableClientTransport{
-			Endpoint:   params.URL,
-			HTTPClient: httpClient,
+			Endpoint:             params.URL,
+			HTTPClient:           httpClient,
+			DisableStandaloneSSE: params.DisableStandaloneSSE != nil && *params.DisableStandaloneSSE,
 		}
 	}
 

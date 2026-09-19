@@ -134,6 +134,14 @@ spec:
                   rule: '!(self.from == ''Selector'' && !has(self.selector))'
               description:
                 type: string
+              disableStandaloneSSE:
+                description: |-
+                  DisableStandaloneSSE disables the standalone GET event stream for Streamable
+                  HTTP connections in controller discovery and the Go ADK. POST requests,
+                  including streamed tool responses, are unaffected. Enable this only for
+                  servers that do not require server-initiated notifications. Defaults to false;
+                  ignored for the SSE protocol. Other runtimes may not support this option.
+                type: boolean
               headersFrom:
                 items:
                   description: ValueRef represents a configuration value

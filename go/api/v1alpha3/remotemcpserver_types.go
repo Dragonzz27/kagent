@@ -60,6 +60,14 @@ type RemoteMCPServerSpec struct {
 	// +kubebuilder:default=true
 	TerminateOnClose *bool `json:"terminateOnClose,omitempty"`
 
+	// DisableStandaloneSSE disables the standalone GET event stream for Streamable
+	// HTTP connections in controller discovery and the Go ADK. POST requests,
+	// including streamed tool responses, are unaffected. Enable this only for
+	// servers that do not require server-initiated notifications. Defaults to false;
+	// ignored for the SSE protocol. Other runtimes may not support this option.
+	// +optional
+	DisableStandaloneSSE *bool `json:"disableStandaloneSSE,omitempty"`
+
 	// AllowedNamespaces defines which namespaces are allowed to reference this RemoteMCPServer.
 	// This follows the Gateway API pattern for cross-namespace route attachments.
 	// If not specified, only Agents in the same namespace can reference this RemoteMCPServer.

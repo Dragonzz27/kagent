@@ -184,6 +184,34 @@ func TestConfigurationCRDValidation(t *testing.T) {
 			require.ErrorContains(t, err, tc.wantReject)
 		})
 	}
+
+	for _, tc := range []struct {
+		name     string
+		disabled *bool
+	}{
+		{name: "unset"},
+		{name: "false", disabled: new(false)},
+		{name: "true", disabled: new(true)},
+	} {
+		t.Run("RemoteMCPServer preserves standalone SSE setting/"+tc.name, func(t *testing.T) {
+			server := &RemoteMCPServer{
+				ObjectMeta: metav1.ObjectMeta{Name: "standalone-sse-" + tc.name, Namespace: namespace},
+				Spec: RemoteMCPServerSpec{
+					Description: "test transport", URL: "https://mcp.example.test",
+					DisableStandaloneSSE: tc.disabled,
+				},
+			}
+			require.NoError(t, cl.Create(ctx, server))
+			var stored RemoteMCPServer
+			require.NoError(t, cl.Get(ctx, ctrlclient.ObjectKeyFromObject(server), &stored))
+			require.Equal(t, tc.disabled, stored.Spec.DisableStandaloneSSE)
+			copy := stored.DeepCopy()
+			if stored.Spec.DisableStandaloneSSE != nil {
+				*stored.Spec.DisableStandaloneSSE = !*stored.Spec.DisableStandaloneSSE
+				require.Equal(t, tc.disabled, copy.Spec.DisableStandaloneSSE)
+			}
+		})
+	}
 }
 
 func validHarness(namespace, name string, overrides HarnessSpec) *Harness {

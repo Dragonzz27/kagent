@@ -1346,6 +1346,11 @@ func (in *RemoteMCPServerSpec) DeepCopyInto(out *RemoteMCPServerSpec) {
 		*out = new(bool)
 		**out = **in
 	}
+	if in.DisableStandaloneSSE != nil {
+		in, out := &in.DisableStandaloneSSE, &out.DisableStandaloneSSE
+		*out = new(bool)
+		**out = **in
+	}
 	if in.AllowedNamespaces != nil {
 		in, out := &in.AllowedNamespaces, &out.AllowedNamespaces
 		*out = new(AllowedNamespaces)

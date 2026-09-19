@@ -128,6 +128,9 @@ func claudeMCPTransport(server *v1alpha3.RemoteMCPServer) (string, string, error
 	if server.Spec.TerminateOnClose != nil && !*server.Spec.TerminateOnClose {
 		ignored = append(ignored, "terminateOnClose")
 	}
+	if server.Spec.DisableStandaloneSSE != nil && *server.Spec.DisableStandaloneSSE {
+		ignored = append(ignored, "disableStandaloneSSE")
+	}
 	var warning string
 	if len(ignored) != 0 {
 		warning = fmt.Sprintf("Claude RemoteMCPServer %q ignores unsupported fields %s", server.Name, strings.Join(ignored, ", "))

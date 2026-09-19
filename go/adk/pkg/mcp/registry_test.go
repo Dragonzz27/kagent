@@ -6,9 +6,11 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
+	"sync/atomic"
 	"testing"
 
 	"github.com/a2aproject/a2a-go/v2/a2asrv"
+	"github.com/kagent-dev/kagent/go/api/adk"
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
 	adkagent "google.golang.org/adk/v2/agent"
 	"google.golang.org/adk/v2/session"
@@ -578,5 +580,83 @@ func TestStaticHeaders_OverrideDynamic(t *testing.T) {
 
 	if capturedAuth != "Bearer static" {
 		t.Errorf("Authorization: got %q, want %q", capturedAuth, "Bearer static")
+	}
+}
+
+func TestCreateTransportStandaloneSSE(t *testing.T) {
+	for _, disabled := range []*bool{nil, new(false), new(true)} {
+		transport, err := createTransport(t.Context(), mcpServerParams{
+			URL: "http://localhost/mcp", ServerType: "http", DisableStandaloneSSE: disabled,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		want := disabled != nil && *disabled
+		if got := transport.(*mcpsdk.StreamableClientTransport).DisableStandaloneSSE; got != want {
+			t.Fatalf("DisableStandaloneSSE = %v, want %v", got, want)
+		}
+	}
+	transport, err := createTransport(t.Context(), mcpServerParams{
+		URL: "http://localhost/sse", ServerType: "sse", DisableStandaloneSSE: new(true),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := transport.(*mcpsdk.SSEClientTransport); !ok {
+		t.Fatalf("legacy SSE transport changed: %T", transport)
+	}
+}
+
+func TestCreateToolsetsWithoutStandaloneSSE(t *testing.T) {
+	server := mcpsdk.NewServer(&mcpsdk.Implementation{Name: "post-only", Version: "1"}, nil)
+	mcpsdk.AddTool(server, &mcpsdk.Tool{Name: "getWeather"}, func(context.Context, *mcpsdk.CallToolRequest, map[string]any) (*mcpsdk.CallToolResult, map[string]any, error) {
+		return nil, map[string]any{"weather": "sunny"}, nil
+	})
+	handler := mcpsdk.NewStreamableHTTPHandler(func(*http.Request) *mcpsdk.Server { return server }, nil)
+	var gets atomic.Int32
+	httpServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			gets.Add(1)
+			http.Error(w, "standalone stream unavailable", http.StatusMethodNotAllowed)
+			return
+		}
+		handler.ServeHTTP(w, r)
+	}))
+	defer httpServer.Close()
+
+	toolsets := CreateToolsets(t.Context(), []adk.HttpMcpServerConfig{{
+		Params: adk.StreamableHTTPConnectionParams{Url: httpServer.URL, DisableStandaloneSSE: new(true)},
+	}}, nil, nil, false, nil)
+	if len(toolsets) != 1 {
+		t.Fatalf("toolsets = %d, want 1", len(toolsets))
+	}
+	tools, err := toolsets[0].Tools(testReadonlyContext{Context: t.Context()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(tools) != 1 || tools[0].Name() != "getWeather" {
+		t.Fatalf("discovered tools = %v, want getWeather", tools)
+	}
+	transport, err := createTransport(t.Context(), mcpServerParams{
+		URL: httpServer.URL, ServerType: "http", DisableStandaloneSSE: new(true),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	client := mcpsdk.NewClient(&mcpsdk.Implementation{Name: "test", Version: "1"}, nil)
+	session, err := client.Connect(t.Context(), transport, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer session.Close()
+	result, err := session.CallTool(t.Context(), &mcpsdk.CallToolParams{Name: "getWeather", Arguments: map[string]any{}})
+	if err != nil || result.IsError {
+		t.Fatalf("tool call failed: result=%v, err=%v", result, err)
+	}
+	if result.StructuredContent.(map[string]any)["weather"] != "sunny" {
+		t.Fatalf("tool result = %v, want sunny weather", result)
+	}
+	if n := gets.Load(); n != 0 {
+		t.Fatalf("made %d standalone GET requests despite disable_standalone_sse", n)
 	}
 }

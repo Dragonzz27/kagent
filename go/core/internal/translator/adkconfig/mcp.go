@@ -24,7 +24,7 @@ func (c *Builder) addRemoteMCPServer(config *adk.AgentConfig, runtime *modelRunt
 			Params: params, Tools: tools, RequireApproval: requireApproval,
 		})
 	default:
-		params := adk.StreamableHTTPConnectionParams{Url: targetURL, Headers: headers}
+		params := adk.StreamableHTTPConnectionParams{Url: targetURL, Headers: headers, DisableStandaloneSSE: server.Spec.DisableStandaloneSSE}
 		if server.Spec.Timeout != nil {
 			params.Timeout = new(server.Spec.Timeout.Seconds())
 		}

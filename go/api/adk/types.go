@@ -10,11 +10,12 @@ import (
 )
 
 type StreamableHTTPConnectionParams struct {
-	Url              string            `json:"url"`
-	Headers          map[string]string `json:"headers"`
-	Timeout          *float64          `json:"timeout,omitempty"`
-	SseReadTimeout   *float64          `json:"sse_read_timeout,omitempty"`
-	TerminateOnClose *bool             `json:"terminate_on_close,omitempty"`
+	Url                  string            `json:"url"`
+	Headers              map[string]string `json:"headers"`
+	Timeout              *float64          `json:"timeout,omitempty"`
+	SseReadTimeout       *float64          `json:"sse_read_timeout,omitempty"`
+	TerminateOnClose     *bool             `json:"terminate_on_close,omitempty"`
+	DisableStandaloneSSE *bool             `json:"disable_standalone_sse,omitempty"`
 	// TLS configuration for self-signed certificates
 	TLSInsecureSkipVerify *bool   `json:"tls_insecure_skip_verify,omitempty"`
 	TLSCACertPath         *string `json:"tls_ca_cert_path,omitempty"`

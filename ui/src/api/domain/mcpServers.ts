@@ -19,6 +19,7 @@ export interface RemoteMCPServerSpec {
   timeout?: string;
   sseReadTimeout?: string;
   terminateOnClose?: boolean;
+  disableStandaloneSSE?: boolean;
   tls?: TLSConfig;
 }
 

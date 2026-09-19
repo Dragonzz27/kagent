@@ -1,6 +1,7 @@
 package adkconfig
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/kagent-dev/kagent/go/api/adk"
@@ -50,5 +51,23 @@ func TestAddRemoteMCPServerPreservesBindingApproval(t *testing.T) {
 			require.NoError(t, err)
 			test.assert(t, config)
 		})
+	}
+}
+
+func TestAddRemoteMCPServerStandaloneSSE(t *testing.T) {
+	for _, disabled := range []*bool{nil, new(false), new(true)} {
+		config := &adk.AgentConfig{}
+		server := &v1alpha3.RemoteMCPServer{Spec: v1alpha3.RemoteMCPServerSpec{
+			URL: "https://mcp.example.test", DisableStandaloneSSE: disabled,
+		}}
+		err := (&Builder{}).addRemoteMCPServer(config, &modelRuntime{data: &modelDeploymentData{}}, server, nil, false, nil)
+		require.NoError(t, err)
+		require.Len(t, config.HttpTools, 1)
+		require.Equal(t, disabled, config.HttpTools[0].Params.DisableStandaloneSSE)
+		encoded, err := json.Marshal(config)
+		require.NoError(t, err)
+		var restored adk.AgentConfig
+		require.NoError(t, json.Unmarshal(encoded, &restored))
+		require.Equal(t, disabled, restored.HttpTools[0].Params.DisableStandaloneSSE)
 	}
 }

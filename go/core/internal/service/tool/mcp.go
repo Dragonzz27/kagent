@@ -165,7 +165,10 @@ func (c *RuntimeMCPClient) connect(ctx context.Context, ref MCPServerRef) (*mcp.
 	case v1alpha3.RemoteMCPServerProtocolSse:
 		transport = &mcp.SSEClientTransport{Endpoint: server.Spec.URL, HTTPClient: httpClient}
 	default:
-		transport = &mcp.StreamableClientTransport{Endpoint: server.Spec.URL, HTTPClient: httpClient}
+		transport = &mcp.StreamableClientTransport{
+			Endpoint: server.Spec.URL, HTTPClient: httpClient,
+			DisableStandaloneSSE: server.Spec.DisableStandaloneSSE != nil && *server.Spec.DisableStandaloneSSE,
+		}
 	}
 
 	capabilities := &mcp.ClientCapabilities{}

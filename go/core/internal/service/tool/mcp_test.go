@@ -1,7 +1,11 @@
 package tool
 
 import (
+	"context"
+	"net/http"
+	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"github.com/kagent-dev/kagent/go/api/v1alpha3"
@@ -125,4 +129,41 @@ func TestRuntimeMCPClientResolveServerMatrix(t *testing.T) {
 			assert.Equal(t, test.wantURL, result.Spec.URL)
 		})
 	}
+}
+
+func TestRuntimeMCPClientWithoutStandaloneSSE(t *testing.T) {
+	server := mcp.NewServer(&mcp.Implementation{Name: "post-only", Version: "1"}, nil)
+	mcp.AddTool(server, &mcp.Tool{Name: "getWeather"}, func(context.Context, *mcp.CallToolRequest, map[string]any) (*mcp.CallToolResult, map[string]any, error) {
+		return nil, map[string]any{"weather": "sunny"}, nil
+	})
+	handler := mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server { return server }, nil)
+	var gets atomic.Int32
+	httpServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			gets.Add(1)
+			http.Error(w, "standalone stream unavailable", http.StatusMethodNotAllowed)
+			return
+		}
+		handler.ServeHTTP(w, r)
+	}))
+	defer httpServer.Close()
+
+	remote := &v1alpha3.RemoteMCPServer{
+		ObjectMeta: metav1.ObjectMeta{Name: "post-only", Namespace: "default"},
+		Spec: v1alpha3.RemoteMCPServerSpec{
+			URL: httpServer.URL, Protocol: v1alpha3.RemoteMCPServerProtocolStreamableHttp,
+			DisableStandaloneSSE: new(true),
+		},
+	}
+	client := NewRuntimeMCPClient(toolTestKube(t, true, remote))
+	ref := MCPServerRef{Ref: types.NamespacedName{Name: remote.Name, Namespace: remote.Namespace}, GroupKind: "RemoteMCPServer.kagent.dev"}
+	tools, err := client.ListTools(t.Context(), ref)
+	require.NoError(t, err)
+	require.Len(t, tools, 1)
+	require.Equal(t, "getWeather", tools[0].Name)
+	result, err := client.CallTool(t.Context(), ref, "getWeather", map[string]any{})
+	require.NoError(t, err)
+	require.False(t, result.IsError)
+	require.Equal(t, map[string]any{"weather": "sunny"}, result.StructuredContent)
+	require.Zero(t, gets.Load(), "standalone GET must not be attempted during discovery or tool calls")
 }

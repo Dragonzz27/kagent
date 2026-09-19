@@ -80,6 +80,9 @@ func codexMCPCompatibilityWarning(server *v1alpha3.RemoteMCPServer) string {
 	if server.Spec.TerminateOnClose != nil && !*server.Spec.TerminateOnClose {
 		ignored = append(ignored, "terminateOnClose")
 	}
+	if server.Spec.DisableStandaloneSSE != nil && *server.Spec.DisableStandaloneSSE {
+		ignored = append(ignored, "disableStandaloneSSE")
+	}
 	if len(ignored) == 0 {
 		return ""
 	}
